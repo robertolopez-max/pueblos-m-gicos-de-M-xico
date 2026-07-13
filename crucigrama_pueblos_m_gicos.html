@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crucigrama: Pueblos Mágicos de México</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0fdf4;
+            background-image: radial-gradient(#bbf7d0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        .crossword-grid {
+            display: grid;
+            /* 11 columnas y 10 filas */
+            grid-template-columns: repeat(11, minmax(30px, 45px));
+            grid-template-rows: repeat(10, minmax(30px, 45px));
+            gap: 2px;
+            background-color: #374151;
+            padding: 4px;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            width: max-content;
+            margin: 0 auto;
+        }
+
+        .cell {
+            position: relative;
+            background-color: transparent;
+            width: 100%;
+            padding-bottom: 100%; /* Cuadrado perfecto */
+        }
+
+        .cell-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            border: 2px solid #e5e7eb;
+            background-color: white;
+            color: #1f2937;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            caret-color: transparent; /* Ocultar el cursor de texto parpadeante para dar aspecto de juego */
+        }
+
+        .cell-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            box-shadow: inset 0 0 0 2px #3b82f6;
+        }
+
+        .cell-input.correct {
+            background-color: #4ade80 !important;
+            color: white !important;
+            border-color: #22c55e !important;
+            box-shadow: 0 0 10px rgba(74, 222, 128, 0.5);
+            pointer-events: none; /* Evitar que se modifique una vez correcta */
+            animation: popIn 0.3s ease-out;
+        }
+
+        .cell-number {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: #4b5563;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .cell-input.correct + .cell-number {
+            color: #14532d;
+        }
+
+        .blank-cell {
+            background-color: transparent;
+        }
+
+        .clue-list li {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        
+        .clue-list li:hover {
+            color: #059669;
+        }
+
+        .clue-list li.completed {
+            text-decoration: line-through;
+            color: #9ca3af;
+            pointer-events: none;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Modal styling */
+        dialog {
+            backdrop-filter: blur(5px);
+        }
+        dialog::backdrop {
+            background: rgba(0, 0, 0, 0.4);
+        }
+    </style>
+</head>
+<body class="text-gray-800 h-screen flex flex-col">
+
+    <!-- Header & Timer -->
+    <header class="w-full bg-white shadow-sm py-4 px-6 flex flex-col md:flex-row justify-between items-center gap-4 z-10 sticky top-0">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-extrabold text-green-700 tracking-tight">Pueblos Mágicos</h1>
+            <p class="text-sm text-gray-500 font-medium">Descubre los rincones de México</p>
+        </div>
+        
+        <div class="flex items-center gap-3 bg-gray-900 text-white px-5 py-2 rounded-full shadow-inner">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span id="timer" class="text-xl font-bold tracking-widest">10:00</span>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow p-4 md:p-8 flex flex-col lg:flex-row gap-8 max-w-7xl mx-auto w-full items-start">
+        
+        <!-- Crossword Board (Left) -->
+        <section class="w-full lg:w-3/5 overflow-x-auto pb-4">
+            <div id="crossword-container" class="crossword-grid">
+                <!-- Grid will be generated by JS -->
+            </div>
+        </section>
+
+        <!-- Clues (Right) -->
+        <section class="w-full lg:w-2/5 bg-white p-6 rounded-2xl shadow-lg border border-green-100">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2 border-green-200">Pistas</h2>
+            
+            <div class="flex flex-col gap-6">
+                <!-- Horizontales -->
+                <div>
+                    <h3 class="font-bold text-green-600 mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                        Horizontales
+                    </h3>
+                    <ul id="clues-horizontal" class="space-y-3 text-sm clue-list pl-1">
+                        <!-- Generated by JS -->
+                    </ul>
+                </div>
+
+                <!-- Verticales -->
+                <div>
+                    <h3 class="font-bold text-blue-600 mb-2 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.293 7.293a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 5.414V17a1 1 0 11-2 0V5.414L6.707 7.293a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
+                        Verticales
+                    </h3>
+                    <ul id="clues-vertical" class="space-y-3 text-sm clue-list pl-1">
+                        <!-- Generated by JS -->
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Modals -->
+    <dialog id="message-modal" class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center m-auto open:animate-[popIn_0.3s_ease-out]">
+        <div id="modal-icon" class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
+            <!-- Icon inserted by JS -->
+        </div>
+        <h3 id="modal-title" class="text-2xl font-bold text-gray-900 mb-2"></h3>
+        <p id="modal-message" class="text-gray-600 mb-6"></p>
+        <button onclick="location.reload()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 shadow-md">
+            Volver a Jugar
+        </button>
+    </dialog>
+
+    <script>
+        // Dimensions of the grid based on our logic mapping
+        const ROWS = 10;
+        const COLS = 11;
+
+        // Definition of the Crossword Words
+        const words = [
+            { id: 1, text: "TEQUILA", dir: "H", row: 3, col: 0, clue: "Famoso por su bebida de agave azul (Jalisco)" },
+            { id: 2, text: "TULUM",   dir: "V", row: 3, col: 0, clue: "Ruinas mayas frente al mar Caribe (Quintana Roo)" },
+            { id: 3, text: "CHOLULA", dir: "V", row: 0, col: 5, clue: "Tiene la pirámide con la base más grande del mundo (Puebla)" },
+            { id: 4, text: "ALAMOS",  dir: "H", row: 6, col: 5, clue: "La ciudad de los portales y cuna de María Félix (Sonora)" },
+            { id: 5, text: "COMALA",  dir: "V", row: 4, col: 8, clue: "El 'Pueblo Blanco de América', famoso por la novela Pedro Páramo (Colima)" },
+            { id: 6, text: "MITLA",   dir: "H", row: 7, col: 0, clue: "Lugar de los muertos, famoso por sus ruinas zapotecas (Oaxaca)" }
+        ];
+
+        // Grid representation
+        const gridMap = Array.from({ length: ROWS }, () => Array(COLS).fill(null));
+        let activeWordId = null; 
+        
+        // Timer Configuration
+        const TOTAL_SECONDS = 600; // 10 minutes
+        let timeRemaining = TOTAL_SECONDS;
+        let timerInterval;
+        let gameActive = true;
+
+        function initializeGridData() {
+            words.forEach(word => {
+                word.completed = false;
+                for (let i = 0; i < word.text.length; i++) {
+                    const r = word.dir === 'H' ? word.row : word.row + i;
+                    const c = word.dir === 'H' ? word.col + i : word.col;
+                    
+                    if (!gridMap[r][c]) {
+                        gridMap[r][c] = { letter: word.text[i], words: [], number: null };
+                    }
+                    gridMap[r][c].words.push(word.id);
+                    
+                    // Assign number to the first cell of the word
+                    if (i === 0) {
+                        gridMap[r][c].number = word.id;
+                    }
+                }
+            });
+        }
+
+        function renderGrid() {
+            const container = document.getElementById('crossword-container');
+            
+            for (let r = 0; r < ROWS; r++) {
+                for (let c = 0; c < COLS; c++) {
+                    const cellData = gridMap[r][c];
+                    const cellDiv = document.createElement('div');
+                    cellDiv.className = 'cell';
+
+                    if (cellData) {
+                        // Create input for valid cells
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.maxLength = 1;
+                        input.className = 'cell-input';
+                        input.id = `cell-${r}-${c}`;
+                        input.dataset.row = r;
+                        input.dataset.col = c;
+                        
+                        // Add Event Listeners for Interaction
+                        input.addEventListener('input', (e) => handleInput(e, r, c));
+                        input.addEventListener('keydown', (e) => handleKeydown(e, r, c));
+                        input.addEventListener('focus', () => highlightClue(cellData.words));
+                        
+                        cellDiv.appendChild(input);
+
+                        // Add small number label if it's the start of a word
+                        if (cellData.number) {
+                            const numSpan = document.createElement('span');
+                            numSpan.className = 'cell-number';
+                            numSpan.innerText = cellData.number;
+                            cellDiv.appendChild(numSpan);
+                        }
+                    } else {
+                        // Empty space
+                        cellDiv.classList.add('blank-cell');
+                    }
+                    
+                    container.appendChild(cellDiv);
+                }
+            }
+        }
+
+        function renderClues() {
+            const listH = document.getElementById('clues-horizontal');
+            const listV = document.getElementById('clues-vertical');
+            
+            words.forEach(word => {
+                const li = document.createElement('li');
+                li.id = `clue-${word.id}`;
+                li.innerHTML = `<strong>${word.id}.</strong> ${word.clue}`;
+                li.onclick = () => focusWord(word);
+                
+                if (word.dir === 'H') listH.appendChild(li);
+                else listV.appendChild(li);
+            });
+        }
+
+        function focusWord(word) {
+            activeWordId = word.id;
+            const input = document.getElementById(`cell-${word.row}-${word.col}`);
+            if (input) {
+                input.focus();
+                // Avoid replacing correct letters by moving to first empty
+                moveToFirstEmpty(word);
+            }
+        }
+
+        function moveToFirstEmpty(word) {
+            for (let i = 0; i < word.text.length; i++) {
+                const r = word.dir === 'H' ? word.row : word.row + i;
+                const c = word.dir === 'H' ? word.col + i : word.col;
+                const input = document.getElementById(`cell-${r}-${c}`);
+                if (input && !input.classList.contains('correct') && input.value === '') {
+                    input.focus();
+                    return;
+                }
+            }
+        }
+
+        function highlightClue(wordIds) {
+            document.querySelectorAll('.clue-list li').forEach(li => {
+                li.style.backgroundColor = 'transparent';
+                li.style.borderRadius = '0';
+                li.style.padding = '0';
+            });
+            
+            // Just highlight the first associated clue slightly to show context
+            const activeId = activeWordId && wordIds.includes(activeWordId) ? activeWordId : wordIds[0];
+            activeWordId = activeId;
+
+            const clueEl = document.getElementById(`clue-${activeId}`);
+            if(clueEl && !clueEl.classList.contains('completed')) {
+                clueEl.style.backgroundColor = '#dcfce7'; // green-100
+                clueEl.style.borderRadius = '6px';
+                clueEl.style.padding = '4px 8px';
+                clueEl.style.marginLeft = '-8px';
+            }
+        }
+
+        function handleInput(e, r, c) {
+            if (!gameActive) return;
+            
+            const input = e.target;
+            const value = input.value.replace(/[^A-Za-zñÑáéíóúÁÉÍÓÚ]/g, '').toUpperCase();
+            
+            // Remap accents for simplicity if user types them
+            const accentsMap = {'Á':'A','É':'E','Í':'I','Ó':'O','Ú':'U'};
+            input.value = accentsMap[value] || value;
+            
+            if (input.value !== '') {
+                validateWords();
+                autoAdvance(r, c);
+            }
+        }
+
+        function handleKeydown(e, r, c) {
+            if (!gameActive) return;
+
+            // Handle backspace to go back
+            if (e.key === 'Backspace' && e.target.value === '') {
+                e.preventDefault();
+                moveBackwards(r, c);
+            } else if (e.key.startsWith('Arrow')) {
+                e.preventDefault();
+                navigateGrid(e.key, r, c);
+            }
+        }
+
+        function autoAdvance(r, c) {
+            const word = words.find(w => w.id === activeWordId);
+            if (!word) return;
+
+            let nextR = r, nextC = c;
+            if (word.dir === 'H') nextC++;
+            else nextR++;
+
+            const nextInput = document.getElementById(`cell-${nextR}-${nextC}`);
+            if (nextInput && gridMap[nextR][nextC]?.words.includes(word.id)) {
+                nextInput.focus();
+                // Skip if already correct
+                if(nextInput.classList.contains('correct')){
+                   autoAdvance(nextR, nextC);
+                }
+            }
+        }
+
+        function moveBackwards(r, c) {
+            const word = words.find(w => w.id === activeWordId);
+            if (!word) return;
+
+            let prevR = r, prevC = c;
+            if (word.dir === 'H') prevC--;
+            else prevR--;
+
+            const prevInput = document.getElementById(`cell-${prevR}-${prevC}`);
+            if (prevInput && gridMap[prevR][prevC]?.words.includes(word.id)) {
+                prevInput.focus();
+                if (!prevInput.classList.contains('correct')) {
+                    prevInput.value = '';
+                } else {
+                    moveBackwards(prevR, prevC); // Skip correct ones backwards too
+                }
+            }
+        }
+
+        function navigateGrid(key, r, c) {
+            let nextR = r, nextC = c;
+            if (key === 'ArrowUp') nextR--;
+            if (key === 'ArrowDown') nextR++;
+            if (key === 'ArrowLeft') nextC--;
+            if (key === 'ArrowRight') nextC++;
+
+            const target = document.getElementById(`cell-${nextR}-${nextC}`);
+            if (target) {
+                target.focus();
+                // Update active word id context based on arrow movement
+                const targetData = gridMap[nextR][nextC];
+                if(targetData) {
+                    if (key === 'ArrowLeft' || key === 'ArrowRight') {
+                        const hWord = words.find(w => w.dir === 'H' && targetData.words.includes(w.id));
+                        if(hWord) activeWordId = hWord.id;
+                    } else {
+                        const vWord = words.find(w => w.dir === 'V' && targetData.words.includes(w.id));
+                        if(vWord) activeWordId = vWord.id;
+                    }
+                }
+            }
+        }
+
+        function validateWords() {
+            let allCompleted = true;
+
+            words.forEach(word => {
+                if (word.completed) return; // Skip already completed
+
+                let currentWordText = "";
+                let cellsToHighlight = [];
+
+                for (let i = 0; i < word.text.length; i++) {
+                    const r = word.dir === 'H' ? word.row : word.row + i;
+                    const c = word.dir === 'H' ? word.col + i : word.col;
+                    const input = document.getElementById(`cell-${r}-${c}`);
+                    
+                    if (input) {
+                        currentWordText += input.value;
+                        cellsToHighlight.push(input);
+                    }
+                }
+
+                if (currentWordText === word.text) {
+                    word.completed = true;
+                    // Illuminate in Green
+                    cellsToHighlight.forEach(el => {
+                        el.classList.add('correct');
+                        el.readOnly = true;
+                    });
+                    
+                    // Mark clue as done
+                    const clueLi = document.getElementById(`clue-${word.id}`);
+                    if(clueLi) {
+                        clueLi.classList.add('completed');
+                        clueLi.style.backgroundColor = 'transparent'; 
+                    }
+                } else {
+                    allCompleted = false;
+                }
+            });
+
+            if (allCompleted) {
+                endGame(true);
+            }
+        }
+
+        function startTimer() {
+            const timerEl = document.getElementById('timer');
+            timerInterval = setInterval(() => {
+                if(!gameActive) return;
+
+                timeRemaining--;
+                
+                const minutes = Math.floor(timeRemaining / 60).toString().padStart(2, '0');
+                const seconds = (timeRemaining % 60).toString().padStart(2, '0');
+                timerEl.innerText = `${minutes}:${seconds}`;
+
+                // Warning colors
+                if (timeRemaining <= 60) {
+                    timerEl.classList.remove('text-white');
+                    timerEl.classList.add('text-red-500', 'animate-pulse');
+                }
+
+                if (timeRemaining <= 0) {
+                    endGame(false);
+                }
+            }, 1000);
+        }
+
+        function endGame(isWin) {
+            gameActive = false;
+            clearInterval(timerInterval);
+
+            // Disable all inputs
+            document.querySelectorAll('.cell-input').forEach(input => {
+                input.readOnly = true;
+            });
+
+            const modal = document.getElementById('message-modal');
+            const title = document.getElementById('modal-title');
+            const message = document.getElementById('modal-message');
+            const iconContainer = document.getElementById('modal-icon');
+
+            if (isWin) {
+                title.innerText = "¡Felicidades!";
+                title.className = "text-2xl font-bold text-green-600 mb-2";
+                message.innerText = `Has completado el crucigrama y demostrado tu conocimiento sobre los Pueblos Mágicos de México. ¡Sobró ${Math.floor(timeRemaining/60)}:${(timeRemaining%60).toString().padStart(2,'0')} de tiempo!`;
+                iconContainer.className = "mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4";
+                iconContainer.innerHTML = `<svg class="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+            } else {
+                title.innerText = "¡Tiempo Agotado!";
+                title.className = "text-2xl font-bold text-red-600 mb-2";
+                message.innerText = "No lograste completar todos los Pueblos Mágicos a tiempo. ¡Inténtalo de nuevo!";
+                iconContainer.className = "mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4";
+                iconContainer.innerHTML = `<svg class="h-10 w-10 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+                
+                // Show solutions for uncompleted words in faint red
+                words.forEach(word => {
+                    if (!word.completed) {
+                        for (let i = 0; i < word.text.length; i++) {
+                            const r = word.dir === 'H' ? word.row : word.row + i;
+                            const c = word.dir === 'H' ? word.col + i : word.col;
+                            const input = document.getElementById(`cell-${r}-${c}`);
+                            if (input && !input.classList.contains('correct')) {
+                                input.value = word.text[i];
+                                input.style.color = '#ef4444'; // text-red-500
+                                input.style.backgroundColor = '#fee2e2'; // bg-red-100
+                            }
+                        }
+                    }
+                });
+            }
+
+            modal.showModal();
+        }
+
+        // Initialize App
+        window.onload = () => {
+            initializeGridData();
+            renderGrid();
+            renderClues();
+            startTimer();
+            
+            // Focus first input
+            const firstInput = document.querySelector('.cell-input');
+            if(firstInput) firstInput.focus();
+        };
+
+    </script>
+</body>
+</html>
